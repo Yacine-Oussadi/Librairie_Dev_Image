@@ -1,0 +1,3 @@
+/home/yaoussadi/M_yaoussadi/Librairie_dev_image/Projet2024/solutions/build/CMakeFiles/lines.dir
+/home/yaoussadi/M_yaoussadi/Librairie_dev_image/Projet2024/solutions/build/CMakeFiles/edit_cache.dir
+/home/yaoussadi/M_yaoussadi/Librairie_dev_image/Projet2024/solutions/build/CMakeFiles/rebuild_cache.dir
