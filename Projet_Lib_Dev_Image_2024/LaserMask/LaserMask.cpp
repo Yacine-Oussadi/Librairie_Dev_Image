@@ -26,7 +26,7 @@ cv::Mat laserMask(cv::Mat imageInput){
     cv::Mat imgMedian;
     cv::Mat imgBinaire;
 
-    cv::threshold(imgS, imgBinaire, 120, 130, 0);
+    cv::threshold(imgS, imgBinaire, 110, 135, 0);
     cv::medianBlur(imgBinaire, imgMedian, 3);
 
     // Ouverture et suppression du bruit engendré

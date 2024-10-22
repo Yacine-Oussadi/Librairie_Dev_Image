@@ -7,22 +7,8 @@
 
 #include "LinesCross.hpp"
 
-void drawLines(std::vector<cv::Vec2f> lines, cv::Mat imgResult){
-    for(size_t i = 0; i < lines.size(); i++){
-        float rho = lines[i][0]; float theta = lines[i][1];
-        cv::Point pt1, pt2;
-        double a = cos(theta), b = sin(theta);
-        double x0 = a*rho, y0 = b*rho;
-        pt1.x = cvRound(x0 + 1000*(-b));
-        pt1.y = cvRound(y0 + 1000*(a));
-        pt2.x = cvRound(x0 - 1000*(-b));
-        pt2.y = cvRound(y0 - 1000*(a));
-        line(imgResult, pt1, pt2, cv::Scalar(0,0,255), 3, cv::LINE_AA);
-    }
-}
-
-void drawPoint(cv::Point point, cv::Mat imgResult){
-    circle(imgResult, point, 3, cv::Scalar(255, 0, 0), 3);
+void drawPoint(cv::Mat imgResult, cv::Point point){
+    circle(imgResult, point, 1, cv::Scalar(255, 0, 0), 1,5);
 }
 
 cv::Point crossPoint(float ro1, float th1, float ro2, float th2){

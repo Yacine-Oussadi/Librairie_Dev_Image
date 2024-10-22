@@ -7,3 +7,5 @@
 //std::vector<cv::Rect> groupRectangles(std::vector<cv::Rect> rectangles);
 void extraireVoisinsConnexes(cv::Mat &mask, cv::Mat &output, cv::Point seedPoint, int connectivity);
 cv::Mat plantsMask(cv::Mat img);
+std::vector<cv::Rect> extractRectangles(cv::Mat mask);
+std::vector<cv::Point> extractCentroids(std::vector<cv::Rect> rectangles);

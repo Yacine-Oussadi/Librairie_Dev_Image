@@ -7,17 +7,74 @@
 #include <vector>
 #include "PlantsMask.hpp"
 
-/*TODO:
-std::vector<cv::Rect> groupRectangles(std::vector<cv::Rect> rectangles){
-    std::vector<cv::Rect> resultVector;
+// Fonction qui regroupe les rectangles qui s'intersectent en un seul rectangle
+void mergeRectangles(std::vector<cv::Rect>& rectangles, bool recursiveMerge = false, std::function<bool(const cv::Rect& r1, const cv::Rect& r2)> mergeFn = nullptr) {
+    static auto defaultFn = [](const cv::Rect& r1, const cv::Rect& r2) {
+        return (r1.x < (r2.x + r2.width) && (r1.x + r1.width) > r2.x && r1.y < (r2.y + r2.height) && (r1.y + r1.height) > r2.y);
+    };
 
-    for(int i = 0; i < rectangles.size(); i++){
-        for(int j = i+1; j < rectangles.size(); j++){
-            
+    static auto innerMerger = [](std::vector<cv::Rect>& rectangles, std::function<bool(const cv::Rect& r1, const cv::Rect& r2)>& mergeFn) {
+        std::vector<std::vector<std::vector<cv::Rect>::const_iterator>> groups;
+        std::vector<cv::Rect> mergedRectangles;
+        bool merged = false;
+
+        static auto findIterator = [&](std::vector<cv::Rect>::const_iterator& iteratorToFind) {
+            for (auto groupIterator = groups.begin(); groupIterator != groups.end(); ++groupIterator) {
+                auto foundIterator = std::find(groupIterator->begin(), groupIterator->end(), iteratorToFind);
+                if (foundIterator != groupIterator->end()) {
+                    return groupIterator;
+                }
+            }
+            return groups.end();
+        };
+
+        for (auto rect1_iterator = rectangles.begin(); rect1_iterator != rectangles.end(); ++rect1_iterator) {
+            auto groupIterator = findIterator(rect1_iterator);
+
+            if (groupIterator == groups.end()) {
+                groups.push_back({rect1_iterator});
+                groupIterator = groups.end() - 1;
+            }
+
+            for (auto rect2_iterator = rect1_iterator + 1; rect2_iterator != rectangles.end(); ++rect2_iterator) {
+                if (mergeFn(*rect1_iterator, *rect2_iterator)) {
+                    groupIterator->push_back(rect2_iterator);
+                    merged = true;
+                }
+            }
         }
-    }
+
+        for (auto groupIterator = groups.begin(); groupIterator != groups.end(); ++groupIterator) {
+            auto groupElement = groupIterator->begin();
+
+            int x1 = (*groupElement)->x;
+            int x2 = (*groupElement)->x + (*groupElement)->width;
+            int y1 = (*groupElement)->y;
+            int y2 = (*groupElement)->y + (*groupElement)->height;
+
+            while (++groupElement != groupIterator->end()) {
+                if (x1 > (*groupElement)->x)
+                    x1 = (*groupElement)->x;
+                if (x2 < (*groupElement)->x + (*groupElement)->width)
+                    x2 = (*groupElement)->x + (*groupElement)->width;
+                if (y1 >(*groupElement)->y)
+                    y1 = (*groupElement)->y;
+                if (y2 < (*groupElement)->y + (*groupElement)->height)
+                    y2 = (*groupElement)->y + (*groupElement)->height;
+            }
+
+            mergedRectangles.push_back(cv::Rect(cv::Point(x1, y1), cv::Point(x2, y2)));
+        }
+
+        rectangles = mergedRectangles;
+        return merged;
+    };
+
+    if (!mergeFn)
+        mergeFn = defaultFn;
+
+    while (innerMerger(rectangles, mergeFn) && recursiveMerge);
 }
-*/
 
 // Fonction pour extraire les régions connexes
 void extraireVoisinsConnexes(cv::Mat &mask, cv::Mat &output, cv::Point seedPoint, int connectivity = 8) {
@@ -63,7 +120,7 @@ cv::Mat plantsMask(cv::Mat img) {
     
     // Appliquer des opérations d'ouverture et de fermeture pour nettoyer l'image
     cv::Mat openingKernel = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(9, 9));
-    cv::Mat closingKernel = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(11, 11));
+    cv::Mat closingKernel = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(9, 9));
 
     cv::morphologyEx(mask, mask, cv::MORPH_OPEN, openingKernel);  // Ouverture pour éliminer les petits objets les lignes du laser
     cv::morphologyEx(mask, mask, cv::MORPH_CLOSE, closingKernel); // Fermeture pour combler les trous
@@ -92,6 +149,11 @@ cv::Mat plantsMask(cv::Mat img) {
 
     extraireVoisinsConnexes(mask, regionsConnexes, seedPoint, 8);
 
+    return regionsConnexes;
+}
+
+
+std::vector<cv::Rect> extractRectangles(cv::Mat mask){
     //Rpérage des centroides et des rectangles entourant les plantes connex
     cv::Mat labels;
     cv::Mat stats;
@@ -99,7 +161,7 @@ cv::Mat plantsMask(cv::Mat img) {
 
     cv::connectedComponentsWithStats(mask, labels, stats, centroids);
     std::vector<cv::Rect> rectangles;
-
+    
     for(int i=0; i<stats.rows; i++)
     {
         int x = stats.at<int>(cv::Point(0, i));
@@ -107,9 +169,40 @@ cv::Mat plantsMask(cv::Mat img) {
         int w = stats.at<int>(cv::Point(2, i));
         int h = stats.at<int>(cv::Point(3, i));
         cv::Rect rect(x,y,w,h);
-        cv::rectangle(regionsConnexes, rect, cv::Scalar(255,0,0));
         rectangles.push_back(rect);
+        //std::cout << "Rectangle " << i << " = " << rect << std::endl;
     }
 
-    return regionsConnexes;
+    // Elimination du rectangle englobant l'image
+    rectangles.erase(rectangles.begin());
+
+    // regroupement des rectangles qui s'intersectent
+    //std::cout << "Number of rectangles before merging = "  << rectangles.size() << std::endl;
+    mergeRectangles(rectangles);
+    //std::cout << "Number of rectangles after merging = "  << rectangles.size() << std::endl;
+
+    //elimination des rectangles de très petites taille
+    std::vector<cv::Rect> resultRectangles;
+    
+    for(int i = 0; i < rectangles.size(); i++){
+        if(rectangles[i].height * rectangles[i].width >= (15*15)){
+            resultRectangles.push_back(rectangles[i]);
+        }
+    }
+
+    return resultRectangles;
+}
+
+std::vector<cv::Point> extractCentroids(std::vector<cv::Rect> rectangles){
+    std::vector<cv::Point> centroids;
+
+    for (int i = 0; i < rectangles.size(); i++)
+    {   
+        int x = rectangles[i].x + (rectangles[i].width/2);
+        int y = rectangles[i].y + (rectangles[i].height/2);
+        
+        centroids.push_back(cv::Point(x,y));
+    }
+    
+    return centroids;
 }
